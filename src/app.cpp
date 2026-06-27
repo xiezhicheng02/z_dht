@@ -13,10 +13,10 @@ namespace z_dht {
         auto v = Value::Dictionary{{"id", Value("a")}};
 
 
-        cout << encode(Value(v)) << endl;
+        std::cout << encode(Value(v)) << std::endl;
         auto vv = dencode("l2:xzi129ee");
         for (const auto &value: vv) {
-            cout << encode(value) << endl;
+            std::cout << encode(value) << std::endl;
         }
 
         return 0;
