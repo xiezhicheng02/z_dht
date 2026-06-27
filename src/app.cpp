@@ -8,17 +8,15 @@
 namespace z_dht {
     int App::run() {
         using namespace z_dht::bencode;
-        std::cout << "z_dht scaffold ready\n";
-        std::cout << "Next steps: coroutine scheduler, UDP transport, DHT engine\n";
-        auto v = Value::Dictionary{{"id", Value("a")}};
 
-
-        std::cout << encode(Value(v)) << std::endl;
-        auto vv = dencode("l2:xzi129ee");
-        for (const auto &value: vv) {
-            std::cout << encode(value) << std::endl;
+        auto str = "d3:keyl13:xzc2:is4:goodi19584678752eee";
+        auto list = dencode(str);
+        for (auto &value: list) {
+            std::cout << value << std::endl;
         }
 
+        auto v= Value({"string","12"})      ;
+        std::cout << v << std::endl;
         return 0;
     }
 } // namespace z_dht
