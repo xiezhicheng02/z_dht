@@ -16,3 +16,12 @@ add_executable(z_dht
 )
 
 target_include_directories(z_dht PRIVATE include)
+
+# --- tests ---
+add_executable(z_dht_test
+    tests/bencode_test.cpp
+    src/bencode/encoder.cpp
+    src/bencode/value.cpp
+)
+
+target_include_directories(z_dht_test PRIVATE include)

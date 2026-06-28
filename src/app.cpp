@@ -10,7 +10,7 @@ namespace z_dht {
         using namespace z_dht::bencode;
 
         auto str = "d3:keyi123eei47e";
-        auto list = dencode(str);
+        auto list = decode(str);
         for (auto &value: list) {
             std::cout << value << std::endl;
         }

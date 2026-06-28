@@ -1,43 +1,31 @@
 #include "z_dht/bencode/encoder.hpp"
 
-#include <string>
-#include <stack>
+#include <cctype>
+#include <map>
 #include <stdexcept>
-/**
-* Bencode（B编码）是 BitTorrent (BT) 协议中使用的一种轻量级、高效的数据序列化格式，专门用于在网络中传输和存储结构化数据（如 .torrent 种子文件）。
-它的设计哲学是“简洁即真理”，没有像 JSON 或 XML 那样复杂的语法，而是通过单个前缀字符来标识数据类型，具有无歧义、确定性和紧凑的特点。Bencode 仅支持四种基本数据类型：
-1. 字符串（Bytes/String）
-字符串的编码规则是：先写字符串的长度，然后是一个冒号 :，最后跟上实际的字符串内容。
-格式：<长度>:<内容>
-示例：4:spam 表示字符串 "spam"；6:python 表示字符串 "python"。
-2. 整数（Integer）
-整数以 i 开头，后跟十进制数字，最后以 e 结束。
-格式：i<数字>e
-示例：i42e 表示整数 42；i-3e 表示整数 -3；i0e 表示 0。注意，像 i-0e 或 i03e（前导零）这样的格式是无效的。
-3. 列表（List）
-列表以 l 开头，包含多个 Bencode 编码的元素，最后以 e 结束。列表中的元素可以是任意合法的 Bencode 类型，支持无限嵌套。
-格式：l<元素1><元素2>...e
-示例：l4:spam4:eggse 表示列表 ["spam", "eggs"]；l4:spami123ee 表示混合类型列表 ["spam", 123]。
-4. 字典（Dictionary）
-字典以 d 开头，包含键值对，最后以 e 结束。字典的键必须是字符串，且必须严格按照字典序（字母顺序）升序排列，值可以是任意合法的 Bencode 类型。
-格式：d<键1><值1><键2><值2>...e
-示例：d3:foo3:bar4:spami42ee 表示字典 {"foo": "bar", "spam": 42}。
-核心设计特点
-紧凑性：去除了所有空格、换行、引号和逗号等冗余符号，非常适合低带宽的 P2P 网络环境。
-确定性（Deterministic Encoding）：由于强制规定了字典键的排序规则，无论使用何种编程语言或库生成，相同内容的字典编码后的字节流是完全一致的。这一特性对于 BitTorrent 协议至关重要，因为客户端需要对 info 字典进行 SHA-1 哈希计算以生成唯一的 infohash（磁力链接的核心标识）。
- */
+#include <string>
+#include <vector>
+
 namespace z_dht::bencode {
-    std::vector<Value> dencode(const std::string &input) {
+    /**
+     * 从 bencode 编码字符串中解析出所有顶层 Value。
+     *
+     * Bencode 规范（BitTorrent）：
+     *   - 字符串：<长度>:<内容>，如 "4:spam"
+     *   - 整数：  i<数字>e，如 "i42e"
+     *   - 列表：  l<元素...>e，如 "l4:spami42ee"
+     *   - 字典：  d<键><值>...e，键必须是字符串且按字典序排列
+     */
+    std::vector<Value> decode(const std::string &input) {
         if (input.empty()) {
-            throw std::runtime_error("Cannot decode an empty Bencode string");
+            throw std::runtime_error("无法解析空的 bencode 字符串");
         }
 
         std::vector<Value> result;
-        int len = 0;
+        std::size_t len = 0;
         while (true) {
-            auto v = dencodeOne(input.substr(len));
+            auto v = decodeOne(input.substr(len));
             result.push_back(v);
-            //判断字符串是否解析完成
             len += v.encode_str().length();
             if (len >= input.length()) {
                 break;
@@ -46,95 +34,100 @@ namespace z_dht::bencode {
         return result;
     }
 
-
-    Value dencodeOne(const std::string &input) {
+    /**
+     * 从 bencode 字符串的起始位置解析一个完整的 Value，返回该 Value。
+     * 解析后可通过 encode_str().length() 获知实际消耗的字节数。
+     */
+    Value decodeOne(const std::string &input) {
         auto c = input[0];
         if (c == 'i') {
-            //数字类型
-            int p = 1;
+            // --- 整数: i<数字>e ---
+            std::size_t p = 1;
             while (true) {
-                //判断取值位置是否超出字符串的结尾，
-                if (p > input.length()) {
-                    throw std::out_of_range("invalid input, 数字类型无法解析，没有找到结束符号");
+                if (p >= input.length()) {
+                    throw std::out_of_range("整数格式错误：缺少结束符 e");
                 }
-                //获取当前位置的字符
                 c = input[p];
                 if (c == 'e') {
-                    //找到结束符号， 提取出来内容
                     auto str = input.substr(1, p - 1);
                     return Value(std::stoll(str));
-                } else {
-                    //当前位置不是结束符号， 继续
-                    p++;
                 }
+                p++;
             }
-        } else if (isdigit(c)) {
-            //字符串类型
-            int p = 1;
+        } else if (std::isdigit(static_cast<unsigned char>(c))) {
+            // --- 字符串: <长度>:<内容> ---
+            std::size_t p = 1;
             while (true) {
-                //判断取值位置是否超出字符串的结尾，
-                if (p > input.length()) {
-                    throw std::out_of_range("invalid input, 数字类型无法解析，没有找到结束符号");
+                if (p >= input.length()) {
+                    throw std::out_of_range("字符串格式错误：缺少冒号分隔符");
                 }
-                //获取当前位置的字符
                 c = input[p];
                 if (c == ':') {
-                    // 提取出来内容
                     auto header = input.substr(0, p);
-                    auto len = std::stoll(header);
+                    auto len = std::stoull(header);
                     auto str = input.substr(p + 1, len);
                     return Value(str);
-                } else {
-                    //当前位置不是结束符号， 继续
-                    p++;
                 }
+                p++;
             }
         } else if (c == 'l') {
-            //List类型
-            int p = 1;
+            // --- 列表: l<元素...>e ---
+            std::size_t p = 1;
             std::vector<Value> result;
             while (true) {
-                //判断取值位置是否超出字符串的结尾，
                 if (p >= input.length()) {
-                    throw std::out_of_range("invalid input, 数字类型无法解析，没有找到结束符号");
+                    throw std::out_of_range("列表格式错误：缺少结束符 e");
                 }
-
-                //获取当前位置的字符
                 c = input[p];
                 if (c == 'e') {
-                    //找到结束符号， 提取出来内容
                     return Value(result);
-                } else {
-                    auto v = dencodeOne(input.substr(p));
-                    result.push_back(v);
-                    p = p + v.encode_str().length();
                 }
+                auto v = decodeOne(input.substr(p));
+                result.push_back(v);
+                p += v.encode_str().length();
             }
         } else if (c == 'd') {
-            //字典类型
-            int p = 1;
+            // --- 字典: d<键><值>...e，键必须是字符串 ---
+            std::size_t p = 1;
             std::map<Value::String, Value> result;
             while (true) {
-                //判断取值位置是否超出字符串的结尾，
-                if (p > input.length()) {
-                    throw std::out_of_range("invalid input, 数字类型无法解析，没有找到结束符号");
+                if (p >= input.length()) {
+                    throw std::out_of_range("字典格式错误：缺少结束符 e");
                 }
-                //获取当前位置的字符
                 c = input[p];
                 if (c == 'e') {
-                    //找到结束符号， 提取出来内容
                     return Value(result);
-                } else {
-                    auto first = dencodeOne(input.substr(p));
-                    p = p + first.encode_str().length();
-                    auto second = dencodeOne(input.substr(p));
-                    p = p + second.encode_str().length();
-                    auto key = std::get<Value::String>(first.data());
-                    result.insert({key, second});
                 }
+                auto first = decodeOne(input.substr(p));
+                p += first.encode_str().length();
+                auto second = decodeOne(input.substr(p));
+                p += second.encode_str().length();
+                auto key = std::get<Value::String>(first.data());
+                result.insert({key, second});
             }
         } else {
-            throw std::out_of_range("invalid input, 不符合要求的字符串，无法解析");
+            throw std::out_of_range("不支持的 bencode 前缀字符: " + std::string(1, c));
         }
     }
+
+
+    std::string encodeOne(std::variant<Value::String, Value::Integer, Value::List, Value::Dictionary> input) {
+        if (std::holds_alternative<Value::String>(input)) {
+            auto data = std::get<Value::String>(input);
+            return Value(data).encode_str();
+        } else if (std::holds_alternative<Value::Integer>(input)) {
+            auto data = std::get<Value::Integer>(input);
+            return Value(data).encode_str();
+        } else if (std::holds_alternative<Value::List>(input)) {
+            auto data = std::get<Value::List>(input);
+            return Value(data).encode_str();
+        } else if (std::holds_alternative<Value::Dictionary>(input)) {
+            auto data = std::get<Value::Dictionary>(input);
+            return Value(data).encode_str();
+        } else {
+            throw std::runtime_error("传入的是无法编码的类型");
+        }
+    }
+}
+
 } // namespace z_dht::bencode
