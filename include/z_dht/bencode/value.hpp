@@ -21,12 +21,8 @@ namespace z_dht::bencode {
         std::string encode_str_;
 
     public:
-        /**
-         * 从传入的字符串中解析出来一个符合要求的Value对象，
-         * 注意智慧解析出来一个， 不会多解析， 并且是从字符串的第一个字符开始解析
-         * @param input  传入的字符串
-         */
-        Value(const std::string &input);
+        Value() = default;
+
 
         /**
          * 传入的是特定的数据， 需要将其字符串解析出来并保存
@@ -52,6 +48,8 @@ namespace z_dht::bencode {
     };
 
     // 重载 << 运算符，实现自定义打印
+
+
     inline std::ostream &operator<<(std::ostream &os, const Value &v) {
         auto data = v.data();
         if (std::holds_alternative<Value::String>(data)) {
@@ -85,7 +83,6 @@ namespace z_dht::bencode {
         } else {
             throw std::runtime_error("Unsupported value type");
         }
-
         return os;
     }
 } // namespace z_dht::bencode

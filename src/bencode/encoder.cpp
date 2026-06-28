@@ -27,9 +27,6 @@
 确定性（Deterministic Encoding）：由于强制规定了字典键的排序规则，无论使用何种编程语言或库生成，相同内容的字典编码后的字节流是完全一致的。这一特性对于 BitTorrent 协议至关重要，因为客户端需要对 info 字典进行 SHA-1 哈希计算以生成唯一的 infohash（磁力链接的核心标识）。
  */
 namespace z_dht::bencode {
-
-
-
     std::vector<Value> dencode(const std::string &input) {
         if (input.empty()) {
             throw std::runtime_error("Cannot decode an empty Bencode string");
@@ -38,7 +35,7 @@ namespace z_dht::bencode {
         std::vector<Value> result;
         int len = 0;
         while (true) {
-            auto v = Value(input);
+            auto v = dencodeOne(input.substr(len));
             result.push_back(v);
             //判断字符串是否解析完成
             len += v.encode_str().length();
@@ -47,5 +44,97 @@ namespace z_dht::bencode {
             }
         }
         return result;
+    }
+
+
+    Value dencodeOne(const std::string &input) {
+        auto c = input[0];
+        if (c == 'i') {
+            //数字类型
+            int p = 1;
+            while (true) {
+                //判断取值位置是否超出字符串的结尾，
+                if (p > input.length()) {
+                    throw std::out_of_range("invalid input, 数字类型无法解析，没有找到结束符号");
+                }
+                //获取当前位置的字符
+                c = input[p];
+                if (c == 'e') {
+                    //找到结束符号， 提取出来内容
+                    auto str = input.substr(1, p - 1);
+                    return Value(std::stoll(str));
+                } else {
+                    //当前位置不是结束符号， 继续
+                    p++;
+                }
+            }
+        } else if (isdigit(c)) {
+            //字符串类型
+            int p = 1;
+            while (true) {
+                //判断取值位置是否超出字符串的结尾，
+                if (p > input.length()) {
+                    throw std::out_of_range("invalid input, 数字类型无法解析，没有找到结束符号");
+                }
+                //获取当前位置的字符
+                c = input[p];
+                if (c == ':') {
+                    // 提取出来内容
+                    auto header = input.substr(0, p);
+                    auto len = std::stoll(header);
+                    auto str = input.substr(p + 1, len);
+                    return Value(str);
+                } else {
+                    //当前位置不是结束符号， 继续
+                    p++;
+                }
+            }
+        } else if (c == 'l') {
+            //List类型
+            int p = 1;
+            std::vector<Value> result;
+            while (true) {
+                //判断取值位置是否超出字符串的结尾，
+                if (p >= input.length()) {
+                    throw std::out_of_range("invalid input, 数字类型无法解析，没有找到结束符号");
+                }
+
+                //获取当前位置的字符
+                c = input[p];
+                if (c == 'e') {
+                    //找到结束符号， 提取出来内容
+                    return Value(result);
+                } else {
+                    auto v = dencodeOne(input.substr(p));
+                    result.push_back(v);
+                    p = p + v.encode_str().length();
+                }
+            }
+        } else if (c == 'd') {
+            //字典类型
+            int p = 1;
+            std::map<Value::String, Value> result;
+            while (true) {
+                //判断取值位置是否超出字符串的结尾，
+                if (p > input.length()) {
+                    throw std::out_of_range("invalid input, 数字类型无法解析，没有找到结束符号");
+                }
+                //获取当前位置的字符
+                c = input[p];
+                if (c == 'e') {
+                    //找到结束符号， 提取出来内容
+                    return Value(result);
+                } else {
+                    auto first = dencodeOne(input.substr(p));
+                    p = p + first.encode_str().length();
+                    auto second = dencodeOne(input.substr(p));
+                    p = p + second.encode_str().length();
+                    auto key = std::get<Value::String>(first.data());
+                    result.insert({key, second});
+                }
+            }
+        } else {
+            throw std::out_of_range("invalid input, 不符合要求的字符串，无法解析");
+        }
     }
 } // namespace z_dht::bencode
