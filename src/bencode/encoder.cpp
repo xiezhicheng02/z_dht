@@ -111,7 +111,11 @@ namespace z_dht::bencode {
     }
 
 
-    std::string encodeOne(std::variant<Value::String, Value::Integer, Value::List, Value::Dictionary> input) {
+    /**
+     * 将原始数据直接编码为 bencode 字符串。
+     * 内部构造一个临时 Value 对象并返回其 encode_str()。
+     */
+    std::string encodeOne(const std::variant<Value::String, Value::Integer, Value::List, Value::Dictionary> &input) {
         if (std::holds_alternative<Value::String>(input)) {
             auto data = std::get<Value::String>(input);
             return Value(data).encode_str();
@@ -128,6 +132,5 @@ namespace z_dht::bencode {
             throw std::runtime_error("传入的是无法编码的类型");
         }
     }
-}
 
 } // namespace z_dht::bencode

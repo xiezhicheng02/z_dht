@@ -97,6 +97,28 @@ static void encode_nested() {
     ASSERT_EQ(v.encode_str(), "l3:topli1ei2eee");
 }
 
+// ===== encodeOne 测试 =====
+
+static void encodeOne_integer() {
+    ASSERT_EQ(encodeOne(Value::Integer(42)),  "i42e");
+    ASSERT_EQ(encodeOne(Value::Integer(-1)),  "i-1e");
+}
+
+static void encodeOne_string() {
+    ASSERT_EQ(encodeOne(Value::String("")),     "0:");
+    ASSERT_EQ(encodeOne(Value::String("spam")), "4:spam");
+}
+
+static void encodeOne_list() {
+    Value::List list{Value(1), Value("a")};
+    ASSERT_EQ(encodeOne(list), "li1e1:ae");
+}
+
+static void encodeOne_dict() {
+    Value::Dictionary dict{{"b", Value(2)}, {"a", Value(1)}};
+    ASSERT_EQ(encodeOne(dict), "d1:ai1e1:bi2ee");
+}
+
 // ===== 解码测试 =====
 
 static void decode_integer() {
@@ -221,6 +243,12 @@ int main() {
     TEST(encode_dict);
     TEST(encode_dict_key_order);
     TEST(encode_nested);
+
+    // encodeOne
+    TEST(encodeOne_integer);
+    TEST(encodeOne_string);
+    TEST(encodeOne_list);
+    TEST(encodeOne_dict);
 
     // 解码
     TEST(decode_integer);

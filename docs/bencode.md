@@ -58,13 +58,25 @@ std::cout << v4.encode_str() << std::endl;  // 输出: d1:ai1e1:bi2ee
 using namespace z_dht::bencode;
 
 // 解析单个值
-auto v = dencodeOne("i42e");
+auto v = decodeOne("i42e");
 std::cout << v.data() << std::endl;  // 打印 42（整数）
 
 // 解析多个连续的值
-auto vals = dencode("i1e2:abi42ee");
-// vals[0] => 整数 1,  编码 "i1e"
+auto vals = decode("i1e2:abi42ee");
+// vals[0] => 整数 1，  编码 "i1e"
 // vals[1] => 列表 [2:ab, i42e]
+```
+
+### 3. 快捷编码（免构造 Value）
+
+```cpp
+#include "z_dht/bencode/encoder.hpp"
+using namespace z_dht::bencode;
+
+// 直接编码原始数据
+auto s = encodeOne(Value::String("hello"));  // "5:hello"
+auto n = encodeOne(Value::Integer(42));      // "i42e"
+auto l = encodeOne(Value::List{Value(1)});   // "li1ee"
 ```
 
 ### 3. 调试输出
@@ -111,12 +123,13 @@ std::cout << torrent.encode_str() << std::endl;
 | `std::string encode_str() const`     | 返回 bencode 编码后的字符串     |
 | `auto data() const`                  | 返回原始 variant 数据           |
 
-### 解码函数
+### 解码 / 编码函数
 
-| 函数                                | 说明                           |
-|-------------------------------------|--------------------------------|
-| `dencode(const std::string&)`       | 解析所有顶层 Value，返回 vector |
-| `dencodeOne(const std::string&)`    | 只解析第一个顶层 Value          |
+| 函数                                                                    | 说明                                   |
+|-------------------------------------------------------------------------|----------------------------------------|
+| `decode(const std::string&)`                                            | 解析所有顶层 Value，返回 vector         |
+| `decodeOne(const std::string&)`                                         | 只解析第一个顶层 Value                  |
+| `encodeOne(const std::variant<...>&)`                                   | 将原始数据直接编码为 bencode 字符串      |
 
 ---
 
