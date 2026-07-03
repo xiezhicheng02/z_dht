@@ -1,12 +1,33 @@
 #include "z_dht/bencode/encoder.hpp"
 
 #include <cctype>
+#include <istream>
 #include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace z_dht::bencode {
+    namespace {
+        bool isDigit(const char &c) {
+            switch (c) {
+                case '0':
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
+                case '8':
+                case '9':
+                    return true;
+                default:
+                    return false;
+            }
+        }
+    }
+
     /**
      * 从 bencode 编码字符串中解析出所有顶层 Value。
      *
@@ -34,6 +55,63 @@ namespace z_dht::bencode {
         return result;
     }
 
+    Value decodeOne(std::istream &input) {
+        char c = input.get();
+        if (c == 'i') {
+            std::string str;
+            // --- 整数: i<数字>e ---
+            while (true) {
+                c = input.get();
+                if (c == 'e') {
+                    return Value(std::stoll(str));
+                } else {
+                    str.push_back(c);
+                }
+            }
+        } else if (isDigit(c)) {
+            std::string str;
+            str.push_back(c);
+            // --- 字符串: <长度>:<内容> ---
+            while (true) {
+                c = input.get();
+                str.push_back(c);
+                if (c == ':') {
+                    auto header = str;
+                    auto len = std::stoul(header);
+                    char bs[len];
+                    input.read(bs, len);
+                    return Value(std::string(bs));
+                }
+            }
+        } else if (c == 'l') {
+            // --- 列表: l<元素...>e ---
+            std::vector<Value> result;
+            while (true) {
+                auto v = decodeOne(input);
+                result.push_back(v);
+                if (input.peek() == 'e') {
+                    input.get();
+                    return Value(result);
+                }
+            }
+        } else if (c == 'd') {
+            // --- 字典: d<键><值>...e，键必须是字符串 ---
+            std::map<Value::String, Value> result;
+            while (true) {
+                auto first = decodeOne(input);
+                auto second = decodeOne(input);
+                auto key = std::get<Value::String>(first.data());
+                result.insert({key, second});
+                if (input.peek() == 'e') {
+                    input.get();
+                    return Value(result);
+                }
+            }
+        } else {
+            throw std::out_of_range("不支持的 bencode 前缀字符: " + std::string(1, c));
+        }
+    }
+
     /**
      * 从 bencode 字符串的起始位置解析一个完整的 Value，返回该 Value。
      * 解析后可通过 encode_str().length() 获知实际消耗的字节数。
@@ -54,7 +132,7 @@ namespace z_dht::bencode {
                 }
                 p++;
             }
-        } else if (std::isdigit(static_cast<unsigned char>(c))) {
+        } else if (isDigit(c)) {
             // --- 字符串: <长度>:<内容> ---
             std::size_t p = 1;
             while (true) {
@@ -115,7 +193,7 @@ namespace z_dht::bencode {
      * 将原始数据直接编码为 bencode 字符串。
      * 内部构造一个临时 Value 对象并返回其 encode_str()。
      */
-    std::string encodeOne(const std::variant<Value::String, Value::Integer, Value::List, Value::Dictionary> &input) {
+    std::string encodeOne(const std::variant<Value::String, Value::Integer, Value::List, Value::Dict> &input) {
         if (std::holds_alternative<Value::String>(input)) {
             auto data = std::get<Value::String>(input);
             return Value(data).encode_str();
@@ -125,12 +203,11 @@ namespace z_dht::bencode {
         } else if (std::holds_alternative<Value::List>(input)) {
             auto data = std::get<Value::List>(input);
             return Value(data).encode_str();
-        } else if (std::holds_alternative<Value::Dictionary>(input)) {
-            auto data = std::get<Value::Dictionary>(input);
+        } else if (std::holds_alternative<Value::Dict>(input)) {
+            auto data = std::get<Value::Dict>(input);
             return Value(data).encode_str();
         } else {
             throw std::runtime_error("传入的是无法编码的类型");
         }
     }
-
 } // namespace z_dht::bencode

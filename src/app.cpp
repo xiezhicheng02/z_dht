@@ -27,7 +27,7 @@ namespace z_dht {
         std::cout << v2 << std::endl;
 
         auto v3 = Value(
-            Value::Dictionary{
+            Value::Dict{
                 {"a", Value(1)},
                 {"b", Value(2)}
             }

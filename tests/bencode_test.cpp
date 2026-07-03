@@ -73,16 +73,16 @@ static void encode_list() {
 }
 
 static void encode_dict() {
-    Value empty(Value::Dictionary{});
+    Value empty(Value::Dict{});
     ASSERT_EQ(empty.encode_str(), "de");
 
-    Value simple(Value::Dictionary{{"a", Value(1)}});
+    Value simple(Value::Dict{{"a", Value(1)}});
     ASSERT_EQ(simple.encode_str(), "d1:ai1ee");
 }
 
 static void encode_dict_key_order() {
     // std::map 保证字典序，所以 {"b":2, "a":1} 编码为 "a" 在前
-    Value v(Value::Dictionary{
+    Value v(Value::Dict{
         {"b", Value(2)},
         {"a", Value(1)}
     });
@@ -115,7 +115,7 @@ static void encodeOne_list() {
 }
 
 static void encodeOne_dict() {
-    Value::Dictionary dict{{"b", Value(2)}, {"a", Value(1)}};
+    Value::Dict dict{{"b", Value(2)}, {"a", Value(1)}};
     ASSERT_EQ(encodeOne(dict), "d1:ai1e1:bi2ee");
 }
 
@@ -149,7 +149,7 @@ static void decode_list() {
 
 static void decode_dict() {
     Value v = decodeOne("d3:fooi42e3:bar4:spame");
-    auto dict = std::get<Value::Dictionary>(v.data());
+    auto dict = std::get<Value::Dict>(v.data());
     ASSERT_EQ(dict.size(), 2U);
     auto foo = dict.find("foo");
     ASSERT_EQ(foo != dict.end(), true);
@@ -161,7 +161,7 @@ static void decode_dict() {
 
 static void decode_nested() {
     Value v = decodeOne("d3:keyli1ei2eee");
-    auto dict = std::get<Value::Dictionary>(v.data());
+    auto dict = std::get<Value::Dict>(v.data());
     auto it = dict.find("key");
     ASSERT_EQ(it != dict.end(), true);
     auto list = std::get<Value::List>(it->second.data());
@@ -223,7 +223,7 @@ static void print_list() {
 
 static void print_dict() {
     std::ostringstream os;
-    os << Value(Value::Dictionary{{"k", Value("v")}});
+    os << Value(Value::Dict{{"k", Value("v")}});
     auto s = os.str();
     ASSERT_EQ(s.find('{'), 0);
     ASSERT_EQ(s.find("k") != std::string::npos, true);
